@@ -23,7 +23,7 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"place-iso-url-here",
+        "iso_url":"place-iso-link-here",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
@@ -107,6 +107,13 @@ class ModWorker(QtCore.QThread):
 
     def _l(self,m,e=False): self.log.emit(m,e)
 
+    def _cleanup_files(self,paths):
+        for f in paths:
+            try:
+                if f and os.path.exists(f):
+                    os.remove(f); self._l("Deleted incomplete file: "+os.path.basename(f),True)
+            except Exception: pass
+
     def _dl(self,label,url,dest):
         self._l("Downloading "+label+" ...")
         # Check if server supports range requests
@@ -115,7 +122,6 @@ class ModWorker(QtCore.QThread):
         accepts_ranges=head.headers.get("accept-ranges","none").lower()=="bytes"
 
         if not total or not accepts_ranges:
-            # Fall back to single-thread if server doesn't support ranges
             self._l("  Server does not support parallel download, using single thread ...")
             self._dl_single(label,url,dest,total)
             return
@@ -130,7 +136,6 @@ class ModWorker(QtCore.QThread):
 
         seg_files=[dest+".part%d"%i for i,_,_ in segments]
         seg_done=[0]*NUM_THREADS
-        seg_total=[end-start+1 for _,start,end in segments]
         lock=threading.Lock()
         errors=[]
 
@@ -144,37 +149,37 @@ class ModWorker(QtCore.QThread):
                     r.raise_for_status()
                     with open(seg_files[i],"wb") as fh:
                         for chunk in r.iter_content(chunk_size=512*1024):
-                            if self._cancelled: return
+                            if self._cancelled: return   # file handle closed cleanly here
                             if chunk:
                                 fh.write(chunk)
                                 with lock:
                                     seg_done[i]+=len(chunk)
-                                    total_done=sum(seg_done)
-                                    self.progress.emit(total_done,total)
+                                    self.progress.emit(sum(seg_done),total)
             except Exception as e:
-                with lock: errors.append("Segment %d: %s"%(i,str(e)))
+                if not self._cancelled:
+                    with lock: errors.append("Segment %d: %s"%(i,str(e)))
 
         threads=[threading.Thread(target=download_segment,args=(i,s,e),daemon=True) for i,s,e in segments]
         for t in threads: t.start()
 
-        # Progress reporting while threads run
+        # Wait for all threads, polling for cancel every 0.5s
         while any(t.is_alive() for t in threads):
+            threading.Event().wait(0.5)
             if self._cancelled:
-                for t in threads: t.join(timeout=2)
-                for f in seg_files:
-                    if os.path.exists(f): os.remove(f)
+                # Wait for all threads to exit their current chunk cleanly
+                for t in threads: t.join(timeout=5)
+                # Now all file handles are closed - safe to delete
+                self._cleanup_files(seg_files+[dest])
                 raise InterruptedError("Cancelled")
             with lock:
                 total_done=sum(seg_done)
                 pct=int(total_done*100/total) if total else 0
             self._l("  %s: %d%%  (%.1f MB / %.1f MB)"%(label,pct,total_done/(1<<20),total/(1<<20)))
-            threading.Event().wait(2)
 
         for t in threads: t.join()
 
         if errors:
-            for f in seg_files:
-                if os.path.exists(f): os.remove(f)
+            self._cleanup_files(seg_files+[dest])
             raise RuntimeError("Parallel download failed:\n"+"\n".join(errors))
 
         # Reassemble segments in order
@@ -186,9 +191,7 @@ class ModWorker(QtCore.QThread):
                     with open(f,"rb") as inp: shutil.copyfileobj(inp,out)
                     os.remove(f)
         except Exception:
-            if os.path.exists(dest): os.remove(dest)
-            for f in seg_files:
-                if os.path.exists(f): os.remove(f)
+            self._cleanup_files(seg_files+[dest])
             raise
 
         self.progress.emit(total,total)
@@ -216,7 +219,8 @@ class ModWorker(QtCore.QThread):
                                 mb=done/(1<<20); prev=(done-len(chunk))/(1<<20)
                                 if int(mb)>int(prev): self._l("  %s: %.0f MB ..."%(label,mb))
         except InterruptedError:
-            if os.path.exists(dest): os.remove(dest); self._l("Deleted incomplete file: "+os.path.basename(dest),True)
+            # File handle is closed here since we're outside the `with open` block
+            self._cleanup_files([dest])
             raise
         self.progress.emit(0,0)
         self._l("Download complete: "+label)
