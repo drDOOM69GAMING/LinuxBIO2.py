@@ -23,7 +23,7 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"place-iso-link-here",
+        "iso_url":"iso-link-goes-here",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
@@ -338,17 +338,39 @@ class ModWorker(QtCore.QThread):
         self._l(note)
         self._l("Launch script: "+script_path)
 
+    def _patch_config_ini(self,game_dir):
+        cfg_path=os.path.join(game_dir,"config.ini")
+        if not os.path.exists(cfg_path):
+            self._l("config.ini not found, skipping BootConfig patch.",True); return
+        with open(cfg_path,"r",encoding="utf-8",errors="replace") as f: content=f.read()
+        import re as _re
+        patched=_re.sub(r'(BootConfig\s*=\s*)0',r'\g<1>1',content)
+        if patched==content:
+            self._l("BootConfig already set to 1 or not found - no change needed."); return
+        with open(cfg_path,"w",encoding="utf-8") as f: f.write(patched)
+        self._l("Patched config.ini: BootConfig = 0  ->  BootConfig = 1")
+
     def _full(self):
         cfg=GAME_CONFIGS[self.game_key]; dl=xdg_download(); desk=xdg_desktop()
         iso=os.path.join(dl,cfg["iso_name"]); mod=os.path.join(dl,cfg["mod_name"])
         staging=os.path.join(dl,cfg["folder"]+"__staging")
         fdir=os.path.join(desk,cfg["final_name"])
 
-        if os.path.exists(iso): self._l("ISO already present, skipping download.")
-        else: self._dl(cfg["iso_name"],cfg["iso_url"],iso)
+        try:
+            if os.path.exists(iso): self._l("ISO already present, skipping download.")
+            else: self._dl(cfg["iso_name"],cfg["iso_url"],iso)
 
-        if os.path.exists(mod): self._l("Mod zip already present, skipping download.")
-        else: self._dl(cfg["mod_name"],cfg["mod_url"],mod)
+            if self._cancelled: raise InterruptedError("Cancelled")
+
+            if os.path.exists(mod): self._l("Mod zip already present, skipping download.")
+            else: self._dl(cfg["mod_name"],cfg["mod_url"],mod)
+
+            if self._cancelled: raise InterruptedError("Cancelled")
+
+        except InterruptedError:
+            # Clean up any partial downloads still sitting in Downloads folder
+            self._cleanup_files([iso, mod])
+            raise
 
         staging=os.path.join(dl,cfg["folder"]+"__staging")
         self._l("Extracting ISO ...")
@@ -376,6 +398,7 @@ class ModWorker(QtCore.QThread):
         self._clean([iso,mod])
 
         self._write_launch_script(fdir,cfg)
+        self._patch_config_ini(fdir)
         self._l("="*50); self._l("ALL DONE! -> "+cfg["final_name"])
         self._l("Run: bash run_proton.sh  (inside the game folder)"); self._l("Good luck, S.T.A.R.S.!"); self._l("="*50)
 
@@ -402,6 +425,7 @@ class ModWorker(QtCore.QThread):
         self._l("Created savedata folder.")
         self._clean([mzip])
         self._write_launch_script(fdir,cfg)
+        self._patch_config_ini(fdir)
         self._l("="*50); self._l("ALL DONE! -> "+cfg["final_name"])
         self._l("Run: bash run_proton.sh  (inside the game folder)"); self._l("Good luck, S.T.A.R.S.!"); self._l("="*50)
 
