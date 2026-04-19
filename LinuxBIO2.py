@@ -23,7 +23,7 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"https://archive.org/download/biohazard-2-japan-source-next/biohazard-2-apan-source-next.iso",
+        "iso_url":"iso-url-goes-here",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
