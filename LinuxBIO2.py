@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S python3 -W ignore
 import os, sys, subprocess, shutil, zipfile, webbrowser, requests, threading
 from queue import Queue
 from PyQt5 import QtWidgets, QtGui, QtCore
@@ -23,7 +23,7 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"iso-url-goes-here",
+        "iso_url":"https://archive.org/download/biohazard-2-japan-source-next/biohazard-2-apan-source-next.iso",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
@@ -580,5 +580,15 @@ class REModderApp(QtWidgets.QWidget):
 
 
 if __name__=="__main__":
+    # Minimize the terminal to taskbar so only the GUI is visible
+    try:
+        import ctypes
+        hwnd=ctypes.windll.kernel32.GetConsoleWindow()
+        if hwnd: ctypes.windll.user32.ShowWindow(hwnd,6)
+    except Exception: pass
+    try:
+        subprocess.run(["xdotool","getactivewindow","windowminimize"],
+                       capture_output=True,timeout=2)
+    except Exception: pass
     app=QtWidgets.QApplication(sys.argv); app.setApplicationName("RE2 Linux Modder")
     win=REModderApp(); win.show(); sys.exit(app.exec_())
