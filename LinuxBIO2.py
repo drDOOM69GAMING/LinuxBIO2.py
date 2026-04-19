@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import os, sys, subprocess, shutil, zipfile, webbrowser, requests
+import os, sys, subprocess, shutil, zipfile, webbrowser, requests, threading
+from queue import Queue
 from PyQt5 import QtWidgets, QtGui, QtCore
 
 def xdg_desktop():
@@ -108,10 +109,97 @@ class ModWorker(QtCore.QThread):
 
     def _dl(self,label,url,dest):
         self._l("Downloading "+label+" ...")
+        # Check if server supports range requests
+        head=requests.head(url,timeout=30,allow_redirects=True)
+        total=int(head.headers.get("content-length",0))
+        accepts_ranges=head.headers.get("accept-ranges","none").lower()=="bytes"
+
+        if not total or not accepts_ranges:
+            # Fall back to single-thread if server doesn't support ranges
+            self._l("  Server does not support parallel download, using single thread ...")
+            self._dl_single(label,url,dest,total)
+            return
+
+        NUM_THREADS=8
+        chunk_size=total//NUM_THREADS
+        segments=[]
+        for i in range(NUM_THREADS):
+            start=i*chunk_size
+            end=(start+chunk_size-1) if i<NUM_THREADS-1 else (total-1)
+            segments.append((i,start,end))
+
+        seg_files=[dest+".part%d"%i for i,_,_ in segments]
+        seg_done=[0]*NUM_THREADS
+        seg_total=[end-start+1 for _,start,end in segments]
+        lock=threading.Lock()
+        errors=[]
+
+        self.progress.emit(0,total)
+        self._l("  Starting %d parallel segments ..."%NUM_THREADS)
+
+        def download_segment(i,start,end):
+            try:
+                headers={"Range":"bytes=%d-%d"%(start,end)}
+                with requests.get(url,headers=headers,stream=True,timeout=300) as r:
+                    r.raise_for_status()
+                    with open(seg_files[i],"wb") as fh:
+                        for chunk in r.iter_content(chunk_size=512*1024):
+                            if self._cancelled: return
+                            if chunk:
+                                fh.write(chunk)
+                                with lock:
+                                    seg_done[i]+=len(chunk)
+                                    total_done=sum(seg_done)
+                                    self.progress.emit(total_done,total)
+            except Exception as e:
+                with lock: errors.append("Segment %d: %s"%(i,str(e)))
+
+        threads=[threading.Thread(target=download_segment,args=(i,s,e),daemon=True) for i,s,e in segments]
+        for t in threads: t.start()
+
+        # Progress reporting while threads run
+        while any(t.is_alive() for t in threads):
+            if self._cancelled:
+                for t in threads: t.join(timeout=2)
+                for f in seg_files:
+                    if os.path.exists(f): os.remove(f)
+                raise InterruptedError("Cancelled")
+            with lock:
+                total_done=sum(seg_done)
+                pct=int(total_done*100/total) if total else 0
+            self._l("  %s: %d%%  (%.1f MB / %.1f MB)"%(label,pct,total_done/(1<<20),total/(1<<20)))
+            threading.Event().wait(2)
+
+        for t in threads: t.join()
+
+        if errors:
+            for f in seg_files:
+                if os.path.exists(f): os.remove(f)
+            raise RuntimeError("Parallel download failed:\n"+"\n".join(errors))
+
+        # Reassemble segments in order
+        self._l("  Reassembling segments ...")
+        self.progress.emit(0,0)
+        try:
+            with open(dest,"wb") as out:
+                for f in seg_files:
+                    with open(f,"rb") as inp: shutil.copyfileobj(inp,out)
+                    os.remove(f)
+        except Exception:
+            if os.path.exists(dest): os.remove(dest)
+            for f in seg_files:
+                if os.path.exists(f): os.remove(f)
+            raise
+
+        self.progress.emit(total,total)
+        self._l("Download complete: "+label)
+
+    def _dl_single(self,label,url,dest,total=0):
         try:
             with requests.get(url,stream=True,timeout=300) as r:
                 r.raise_for_status()
-                total=int(r.headers.get("content-length",0)); done=0; last=-1
+                if not total: total=int(r.headers.get("content-length",0))
+                done=0; last=-1
                 if total: self.progress.emit(0,total)
                 else: self.progress.emit(0,0)
                 with open(dest,"wb") as fh:
@@ -128,8 +216,7 @@ class ModWorker(QtCore.QThread):
                                 mb=done/(1<<20); prev=(done-len(chunk))/(1<<20)
                                 if int(mb)>int(prev): self._l("  %s: %.0f MB ..."%(label,mb))
         except InterruptedError:
-            if os.path.exists(dest):
-                os.remove(dest); self._l("Deleted incomplete file: "+os.path.basename(dest),True)
+            if os.path.exists(dest): os.remove(dest); self._l("Deleted incomplete file: "+os.path.basename(dest),True)
             raise
         self.progress.emit(0,0)
         self._l("Download complete: "+label)
