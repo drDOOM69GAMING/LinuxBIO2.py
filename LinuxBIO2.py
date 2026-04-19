@@ -23,7 +23,7 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"iso-link-goes-here",
+        "iso_url":"iso-url-goes-here",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
@@ -300,12 +300,20 @@ class ModWorker(QtCore.QThread):
                 'EXE="{exe}"\n\n'
                 'export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"\n'
                 'export STEAM_COMPAT_DATA_PATH="$COMPAT_DATA"\n'
-                'export PROTON_LOG=1\n'
+                '# --- RE2 SHDP Linux performance fix ---\n'
+                '# Force native mod DLLs so Wine uses the ones bundled with Classic Rebirth\n'
+                '# and SHDP instead of its own slow translations. dinput8 loads HD textures,\n'
+                '# ddraw is the Classic Rebirth hook - both must be native or textures stutter.\n'
+                'export WINEDLLOVERRIDES="d3d9,d3dcompiler_47,ddraw,dinput8,dsound,libwebp,xaudio2_9=n,b"\n'
+                '# Thread sync - reduces stutter on item pickup, doors and game exit\n'
+                'export WINEESYNC=1\n'
+                'export WINEFSYNC=1\n'
+                '# Async shader compilation - prevents compile hitches mid-game\n'
                 'export DXVK_ASYNC=1\n'
+                '# Cap framerate - reduces GPU thrashing during texture loads\n'
                 'export DXVK_FRAME_RATE=60\n'
-                '# Use native DLLs bundled with the SHDP mod for correct HD texture loading\n'
-                'export WINEDLLOVERRIDES="d3d9,d3dcompiler_47,ddraw,dinput8,dsound,libwebp,xaudio2_9=n,b"\n\n'
-                'echo "Launching with Proton-GE: $PROTON"\n'
+                'export PROTON_LOG=1\n\n'
+                'echo "Launching RE2 SHDP with Proton-GE: $PROTON"\n'
                 'cd "$(dirname "$EXE")"\n'
                 '"$PROTON" run "$EXE" "$@"\n'
             ).format(
@@ -314,7 +322,7 @@ class ModWorker(QtCore.QThread):
                 compat_data=compat_data,
                 exe=exe_path,
             )
-            note="Proton-GE launch script written (with SHDP HD texture fix)."
+            note="Proton-GE launch script written (with full SHDP HD texture + stutter fix)."
         else:
             runner_lines=(
                 '#!/usr/bin/env bash\n'
@@ -322,15 +330,17 @@ class ModWorker(QtCore.QThread):
                 '# WARNING: Proton-GE not found - falling back to Wine.\n'
                 '# Install Proton-GE via ProtonUp-Qt then re-run the modder.\n'
                 'EXE="{exe}"\n\n'
-                '# Use native DLLs bundled with the SHDP mod for correct HD texture loading\n'
+                '# --- RE2 SHDP Linux performance fix ---\n'
                 'export WINEDLLOVERRIDES="d3d9,d3dcompiler_47,ddraw,dinput8,dsound,libwebp,xaudio2_9=n,b"\n'
+                'export WINEESYNC=1\n'
+                'export WINEFSYNC=1\n'
                 'export DXVK_ASYNC=1\n'
                 'export DXVK_FRAME_RATE=60\n\n'
                 'echo "Proton-GE not found - using Wine fallback."\n'
                 'cd "$(dirname "$EXE")"\n'
                 'wine "$EXE" "$@"\n'
             ).format(exe=exe_path)
-            note="Proton-GE not found - Wine fallback script written (with SHDP HD texture fix). Install Proton-GE via ProtonUp-Qt for best results."
+            note="Proton-GE not found - Wine fallback script written (with SHDP fix). Install Proton-GE via ProtonUp-Qt for best results."
 
         script_path=os.path.join(game_dir,"run_proton.sh")
         with open(script_path,"w") as fh: fh.write(runner_lines)
