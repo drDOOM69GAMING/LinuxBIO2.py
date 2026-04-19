@@ -300,10 +300,13 @@ class ModWorker(QtCore.QThread):
                 'EXE="{exe}"\n\n'
                 'export STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_ROOT"\n'
                 'export STEAM_COMPAT_DATA_PATH="$COMPAT_DATA"\n'
-                '# --- RE2 SHDP Linux performance fix ---\n'
-                '# Force native mod DLLs so Wine uses the ones bundled with Classic Rebirth\n'
-                '# and SHDP instead of its own slow translations. dinput8 loads HD textures,\n'
-                '# ddraw is the Classic Rebirth hook - both must be native or textures stutter.\n'
+                '# --- RE2 SHDP Linux fix ---\n'
+                '# bio2.exe is 32-bit. Without LAA it is capped at 2GB virtual memory.\n'
+                '# The SHDP hires textures push it past that ceiling causing black screens\n'
+                '# on doors, item pickup stutter and sluggish exit. LAA lifts the cap to 4GB+.\n'
+                'export WINE_LARGE_ADDRESS_AWARE=1\n'
+                '# Force native mod DLLs - dinput8 loads HD textures, ddraw is the\n'
+                '# Classic Rebirth hook. Both must be native or textures load slowly.\n'
                 'export WINEDLLOVERRIDES="d3d9,d3dcompiler_47,ddraw,dinput8,dsound,libwebp,xaudio2_9=n,b"\n'
                 '# Thread sync - reduces stutter on item pickup, doors and game exit\n'
                 'export WINEESYNC=1\n'
@@ -322,7 +325,7 @@ class ModWorker(QtCore.QThread):
                 compat_data=compat_data,
                 exe=exe_path,
             )
-            note="Proton-GE launch script written (with full SHDP HD texture + stutter fix)."
+            note="Proton-GE launch script written (LAA + full SHDP fix applied)."
         else:
             runner_lines=(
                 '#!/usr/bin/env bash\n'
@@ -330,7 +333,8 @@ class ModWorker(QtCore.QThread):
                 '# WARNING: Proton-GE not found - falling back to Wine.\n'
                 '# Install Proton-GE via ProtonUp-Qt then re-run the modder.\n'
                 'EXE="{exe}"\n\n'
-                '# --- RE2 SHDP Linux performance fix ---\n'
+                '# --- RE2 SHDP Linux fix ---\n'
+                'export WINE_LARGE_ADDRESS_AWARE=1\n'
                 'export WINEDLLOVERRIDES="d3d9,d3dcompiler_47,ddraw,dinput8,dsound,libwebp,xaudio2_9=n,b"\n'
                 'export WINEESYNC=1\n'
                 'export WINEFSYNC=1\n'
@@ -340,7 +344,7 @@ class ModWorker(QtCore.QThread):
                 'cd "$(dirname "$EXE")"\n'
                 'wine "$EXE" "$@"\n'
             ).format(exe=exe_path)
-            note="Proton-GE not found - Wine fallback script written (with SHDP fix). Install Proton-GE via ProtonUp-Qt for best results."
+            note="Proton-GE not found - Wine fallback script written (LAA + SHDP fix). Install Proton-GE via ProtonUp-Qt for best results."
 
         script_path=os.path.join(game_dir,"run_proton.sh")
         with open(script_path,"w") as fh: fh.write(runner_lines)
