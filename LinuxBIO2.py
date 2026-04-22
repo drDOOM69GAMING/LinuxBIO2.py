@@ -22,7 +22,7 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"iso-url-goes-here",
+        "iso_url":"URL_GOES_HERE",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
@@ -109,7 +109,7 @@ HELP_TEXT=(
 #                          any system stub. This is what keeps Classic
 #                          REbirth's 4:3 aspect ratio hook active (bars).
 # dinput8               -> The HD texture loader (bio2hd.asi) is injected
-#                          via dinput8. Must be native or textures won't load.
+#                          via dinput8. Must be builtin for ASI injection.
 # dsound, libwebp       -> TeamX HD mod audio/media support.
 # xaudio2_9             -> Classic REbirth audio subsystem.
 #
@@ -323,8 +323,10 @@ class ModWorker(QtCore.QThread):
             '# DXVK async shader compilation prevents mid-game compile hitches.\n'
             '# First-run hitches on new doors/items are normal (shader caching).\n'
             'export DXVK_ASYNC=1\n'
-            '# 60 fps cap reduces GPU thrashing during texture loads.\n'
-            'export DXVK_FRAME_RATE=60\n'
+            '# Shader state cache speeds up subsequent launches (no recompiles).\n'
+            'export DXVK_STATE_CACHE=1\n'
+            '# Reduce DXVK logging I/O overhead.\n'
+            'export DXVK_LOG_LEVEL=none\n'
         ).format(dlls=DLL_OVERRIDES)
 
         if proton_bin:
