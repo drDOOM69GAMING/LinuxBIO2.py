@@ -1,8 +1,5 @@
 <img width="600" height="550" alt="Screenshot from 2026-04-19 08-46-15" src="https://github.com/user-attachments/assets/b2e4cb52-16fc-412a-99c4-449ca07f3083" />
 
-
-sudo apt install xdotool
-
 # Resident Evil 2 Linux Modder
 
 A PyQt5-based GUI tool for downloading, modding, and launching Resident Evil 2 on Linux using Wine/Proton.
@@ -12,8 +9,10 @@ A PyQt5-based GUI tool for downloading, modding, and launching Resident Evil 2 o
 - **Auto Download**: Downloads the RE2 Japanese PC (Source Next) ISO and Bio2_mod.zip, extracts the ISO, applies the mod, and creates a launch script
 - **Mod Only**: Apply the Bio2_mod.zip to an existing game folder
 - **Reset Proton Prefix**: Rebuild the Wine/Proton prefix if the game stops working
-- **Automatic Launch Script**: Creates a `run_proton.sh` script that auto-detects Proton-GE
+- **Automatic Launch Script**: Creates a `run_proton.sh` script that auto-detects Proton (GE, CachyOS, or any Proton build)
 - **DLL Overrides**: Pre-configured for optimal compatibility (DXVK, DirectDraw, DirectInput, XAudio2)
+- **Dependency Checks**: Validates `7z` is installed before downloading
+- **Disk Space Check**: Verifies 4 GB free in Downloads before starting
 
 ## Requirements
 
@@ -22,7 +21,7 @@ A PyQt5-based GUI tool for downloading, modding, and launching Resident Evil 2 o
 **Debian/Ubuntu:**
 ```bash
 sudo apt update
-sudo apt install python3 python3-pip python3-pyqt5 p7zip-full curl wget
+sudo apt install python3 python3-pip python3-pyqt5 p7zip-full
 ```
 
 **Fedora:**
@@ -30,7 +29,7 @@ sudo apt install python3 python3-pip python3-pyqt5 p7zip-full curl wget
 sudo dnf install python3 python3-pip python3-pyqt5 p7zip
 ```
 
-**Arch Linux:**
+**Arch Linux / CachyOS:**
 ```bash
 sudo pacman -S python python-pyqt5 p7zip
 ```
@@ -43,10 +42,8 @@ pip install PyQt5 requests
 
 ### Additional Requirements
 
-- **Proton-GE** (recommended for best compatibility):
+- **Proton** (recommended for best compatibility):
   Install via [ProtonUp-Qt](https://davidotek.github.io/protonup-qt/)
-
-- **Steam** with Resident Evil 2 installed (optional, for Proton-GE detection)
 
 ## Installation
 
@@ -81,14 +78,14 @@ chmod +x LinuxBIO2.py
 ### Option 2: Mod Only (If You Already Extracted the ISO)
 
 1. Manually extract the RE2 ISO to your Desktop
-2. Rename the folder to: `biohazard-2-apan-source-next`
-3. Click **Auto - Apply Mod Only**
+2. Make sure the folder is named: `biohazard-2-apan-source-next`
+3. Click **Apply Mod Only**
 4. The mod will be applied to your existing folder
 5. Run the game with: `bash run_proton.sh`
 
 ### Option 3: Reset Proton Prefix
 
-If the game won't launch, shows black bars are missing, or you see startup errors:
+If the game won't launch, black bars are missing, or you see startup errors:
 
 1. Click **Reset Proton Prefix**
 2. The tool will delete and rebuild the `proton_pfx` folder
@@ -104,10 +101,7 @@ cd ~/Desktop/biohazard-2-apan-source-next
 bash run_proton.sh
 ```
 
-The script auto-detects:
-- Proton-GE in `~/.steam-root/compatibilitytools.d/`
-- Falls back to system Wine if Proton-GE not found
-- Sets correct environment variables for DXVK and DLL overrides
+The script auto-detects any Proton build in `~/.steam/root/compatibilitytools.d/` or `~/.local/share/Steam/compatibilitytools.d/`, including GE-Proton and CachyOS Proton. It falls back to system Wine if no Proton is found.
 
 ## First Time Configuration
 
@@ -130,18 +124,11 @@ If the bars are missing, the Classic REbirth ddraw hook is not loading. Use **Re
 
 ## Xalia / "Invalid window handle" Errors
 
-These messages are harmless. Xalia is a gamepad accessibility tool built into Proton-GE. It runs alongside every game and its handle errors are normal - they have no effect on gameplay.
+These messages are harmless. Xalia is a gamepad accessibility tool built into Proton-GE. It runs alongside every game and its handle errors are normal, they have no effect on gameplay.
 
 ## Slow Texture Loading (First Playthrough)
 
 On the first playthrough, DXVK compiles shaders on the fly. This causes one-time hitches when opening doors or picking up items. After each transition is triggered once, the shader is cached and subsequent loads are smooth. This is normal.
-
-## Required Game Folder Name
-
-The game folder must be named exactly:
-```
-biohazard-2-apan-source-next
-```
 
 ## DLL Overrides Explained
 
@@ -161,7 +148,7 @@ The modder configures these DLL overrides for optimal compatibility:
 ```bash
 sudo apt install p7zip-full   # Debian/Ubuntu
 sudo dnf install p7zip       # Fedora
-sudo pacman -S p7zip         # Arch Linux
+sudo pacman -S p7zip         # Arch Linux / CachyOS
 ```
 
 ### Game won't launch
@@ -169,6 +156,9 @@ Use **Reset Proton Prefix** to rebuild the Wine prefix.
 
 ### Black bars missing
 The ddraw hook isn't loading. Use **Reset Proton Prefix**.
+
+### Not enough disk space
+The tool requires at least 4 GB free in your Downloads folder before downloading the ISO and mod files.
 
 ### Mod download fails
 Check your internet connection. The mod is hosted on GitHub.
