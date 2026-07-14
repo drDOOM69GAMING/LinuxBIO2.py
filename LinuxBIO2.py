@@ -1,19 +1,19 @@
 #!/usr/bin/env -S python3 -W ignore
-import os, sys, subprocess, shutil, zipfile, webbrowser, requests, threading
+import os, sys, subprocess, shutil, zipfile, webbrowser, requests, threading, time, re
 from PyQt5 import QtWidgets, QtGui, QtCore
 
 def xdg_desktop():
     try:
         out = subprocess.check_output(["xdg-user-dir","DESKTOP"],timeout=3).decode().strip()
         if out and os.path.isdir(out): return out
-    except: pass
+    except Exception: pass
     p = os.path.join(os.path.expanduser("~"),"Desktop"); os.makedirs(p,exist_ok=True); return p
 
 def xdg_download():
     try:
         out = subprocess.check_output(["xdg-user-dir","DOWNLOAD"],timeout=3).decode().strip()
         if out and os.path.isdir(out): return out
-    except: pass
+    except Exception: pass
     p = os.path.join(os.path.expanduser("~"),"Downloads"); os.makedirs(p,exist_ok=True); return p
 
 def cache_dir():
@@ -22,12 +22,12 @@ def cache_dir():
 GAME_CONFIGS = {
     "re2":{
         "title":"Resident Evil 2","folder":"biohazard-2-apan-source-next",
-        "iso_url":"URL_GOES_HERE",
+        "iso_url":"error no url",
         "iso_name":"biohazard-2-apan-source-next.iso",
         "mod_url":"https://github.com/TheOtherGuy66-source/Resident_Evil_Python_Builder_kit/releases/download/amd/Bio2_mod.zip",
         "mod_name":"Bio2_mod.zip","target_subdir":"data",
         "bg_image":"https://www.reshdp.com/img/re2header_uw.jpg",
-        "final_name":"RE2SHDP - RE Seamless HD Project (biohazard-2-apan-source-next)","has_amd_option":False,
+        "final_name":"biohazard-2-apan-source-next","has_amd_option":False,
         "exe_name":"bio2.exe",
     },
 }
@@ -39,56 +39,35 @@ ALL_MODS=[
 HELP_TEXT=(
     "Resident Evil 2 Linux Modder - Help\n"
     "--------------------------------------\n\n"
+    "GETTING STARTED:\n"
+    "  1. Click A/D (Auto Download)\n"
+    "  2. Wait for download + extraction to finish\n"
+    "  3. Run:  bash ~/Desktop/biohazard-2-apan-source-next/run_proton.sh\n\n"
     "BUTTONS:\n\n"
     "  A/D (Auto Download)\n"
-    "    Downloads the RE2 ISO + Bio2_mod.zip, extracts the ISO\n"
-    "    to your Desktop, applies the mod, creates a savedata\n"
-    "    folder, deletes the archives, and writes a\n"
-    "    run_proton.sh launch script.\n\n"
-    "  Auto - Apply Mod Only\n"
-    "    Applies Bio2_mod.zip to an existing game folder on\n"
-    "    your Desktop. Use this if you already extracted the\n"
-    "    ISO manually.\n\n"
+    "    One-click setup. Downloads everything, extracts,\n"
+    "    applies the mod, and creates a launch script.\n\n"
+    "  Apply Mod Only\n"
+    "    If you already extracted the ISO manually.\n"
+    "    Place the extracted folder on your Desktop and\n"
+    "    make sure Bio2_mod.zip is in Downloads.\n\n"
     "  Reset Proton Prefix\n"
-    "    Deletes and rebuilds the proton_pfx folder inside the\n"
-    "    game directory AND rewrites run_proton.sh.\n"
-    "    Use this if the game stopped launching, the black bars\n"
-    "    disappeared, or you see odd errors on startup.\n\n"
-    "LAUNCHING THE GAME:\n"
-    "  A run_proton.sh script is created in the final game folder.\n"
-    "  Run it with:  bash run_proton.sh\n"
-    "  It auto-detects the newest Proton-GE in ~/.steam/root/\n"
-    "  compatibilitytools.d/ and uses the correct Steam env vars.\n"
-    "  If Proton-GE is not found it falls back to Wine.\n"
-    "  Install Proton-GE via ProtonUp-Qt for best compatibility.\n\n"
-    "ABOUT THE BLACK SIDE BARS:\n"
-    "  The black side bars are INTENTIONAL. Classic REbirth\n"
-    "  enforces the correct 4:3 aspect ratio by design.\n"
-    "  If the bars are missing, the Classic REbirth ddraw hook\n"
-    "  is not loading. Use 'Reset Proton Prefix' to fix this.\n\n"
-    "ABOUT XALIA / 'Invalid window handle' IN THE LOG:\n"
-    "  These messages are completely harmless. Xalia is a\n"
-    "  gamepad accessibility tool built into Proton-GE. It runs\n"
-    "  alongside every game and its handle errors are normal.\n"
-    "  They have no effect on gameplay.\n\n"
-    "FIRST TIME CONFIGURATION:\n"
-    "  The modder auto-sets BootConfig = 1 in config.ini.\n"
-    "  Run bash run_proton.sh - the config window will appear.\n"
-    "  Click BEST, untick Texture Filtering, then click OK.\n\n"
-    "CONTROLLER SETUP (in-game):\n"
-    "  Press SELECT in-game to open the controller config.\n"
-    "  Set aim to the front right trigger (R2 / RT).\n\n"
-    "SLOW TEXTURE LOADING (doors / item pickups):\n"
-    "  On the first playthrough DXVK compiles shaders on the fly.\n"
-    "  This causes one-time hitches on first door/item encounters.\n"
-    "  After each transition is triggered once, the shader is\n"
-    "  cached and subsequent loads are smooth. This is normal.\n\n"
-    "REQUIRED GAME FOLDER NAME (exact, on Desktop):\n"
-    "  biohazard-2-apan-source-next\n\n"
-    "NOTES:\n"
-    "  - 7z must be installed: sudo apt install p7zip-full\n"
-    "  - Use the Japanese PC (Source Next) version only.\n"
-    "  - Download progress is shown live in the log console.\n"
+    "    If the game won't start or looks broken.\n"
+    "    Deletes the Wine prefix and rebuilds it fresh.\n\n"
+    "FIRST TIME SETUP:\n"
+    "  After launching, a config window will appear.\n"
+    "  Click BEST, untick Texture Filtering, click OK.\n\n"
+    "CONTROLS:\n"
+    "  Press SELECT in-game to open controller config.\n"
+    "  Set aim to R2 / RT.\n\n"
+    "TROUBLESHOOTING:\n"
+    "  - Black side bars are normal (4:3 aspect ratio)\n"
+    "  - Xalia / 'Invalid window handle' errors are harmless\n"
+    "  - First playthrough has stutter (shader caching, one-time)\n"
+    "  - Game won't launch? Run Reset Proton Prefix\n\n"
+    "REQUIREMENTS:\n"
+    "  - 7z: sudo pacman -S p7zip\n"
+    "  - Proton-GE: install via ProtonUp-Qt\n"
 )
 
 # -----------------------------------------------------------------------
@@ -127,8 +106,8 @@ class ImageWorker(QtCore.QThread):
     def run(self):
         try:
             r=requests.get(self.url,timeout=15); r.raise_for_status()
-            open(self.path,"wb").write(r.content); self.done.emit(self.path)
-        except: self.done.emit("")
+            with open(self.path,"wb") as f: f.write(r.content); self.done.emit(self.path)
+        except Exception: self.done.emit("")
 
 class ModWorker(QtCore.QThread):
     log=QtCore.pyqtSignal(str,bool)
@@ -150,6 +129,23 @@ class ModWorker(QtCore.QThread):
             self.done.emit(False)
 
     def _l(self,m,e=False): self.log.emit(m,e)
+
+    def _check_deps(self):
+        missing=[]
+        if shutil.which("7z") is None: missing.append("7z (install: sudo pacman -S p7zip)")
+        if missing:
+            self._l("Missing dependencies:",True)
+            for m in missing: self._l("  - "+m,True)
+            raise FileNotFoundError("Missing: "+", ".join(missing))
+
+    def _check_disk_space(self,min_bytes):
+        dl=xdg_download()
+        usage=os.statvfs(dl)
+        free=usage.f_bavail*usage.f_frsize
+        if free<min_bytes:
+            need_gb=min_bytes/(1<<30); have_gb=free/(1<<30)
+            self._l("Not enough disk space in Downloads: need %.1f GB, have %.1f GB"%(need_gb,have_gb),True)
+            raise OSError("Insufficient disk space")
 
     def _cleanup_files(self,paths):
         for f in paths:
@@ -195,15 +191,19 @@ class ModWorker(QtCore.QThread):
 
         threads=[threading.Thread(target=download_segment,args=(i,s,e),daemon=True) for i,s,e in segments]
         for t in threads: t.start()
+        last_log=0
         while any(t.is_alive() for t in threads):
-            threading.Event().wait(0.5)
+            time.sleep(0.5)
             if self._cancelled:
                 for t in threads: t.join(timeout=5)
                 self._cleanup_files(seg_files+[dest]); raise InterruptedError("Cancelled")
             with lock:
                 total_done=sum(seg_done)
+            now=time.monotonic()
+            if now-last_log>=2.0:
+                last_log=now
                 pct=int(total_done*100/total) if total else 0
-            self._l("  %s: %d%%  (%.1f MB / %.1f MB)"%(label,pct,total_done/(1<<20),total/(1<<20)))
+                self._l("  %s: %d%%  (%.1f MB / %.1f MB)"%(label,pct,total_done/(1<<20),total/(1<<20)))
         for t in threads: t.join()
         if errors:
             self._cleanup_files(seg_files+[dest])
@@ -287,13 +287,12 @@ class ModWorker(QtCore.QThread):
             compat=os.path.join(sr,"compatibilitytools.d")
             if not os.path.isdir(compat): continue
             for entry in os.listdir(compat):
-                if "proton" in entry.lower() and ("ge" in entry.lower() or "GE" in entry):
-                    proton_bin=os.path.join(compat,entry,"proton")
-                    if os.path.isfile(proton_bin): candidates.append((entry,proton_bin,sr))
+                proton_bin=os.path.join(compat,entry,"proton")
+                if os.path.isfile(proton_bin): candidates.append((entry,proton_bin,sr))
         if not candidates: return None,None
         candidates.sort(key=lambda x:x[0],reverse=True)
         name,proton_bin,steam_root=candidates[0]
-        self._l("Found Proton-GE: "+name)
+        self._l("Found Proton: "+name)
         return proton_bin,steam_root
 
     def _write_launch_script(self,game_dir,cfg):
@@ -385,8 +384,7 @@ class ModWorker(QtCore.QThread):
         if not os.path.exists(cfg_path):
             self._l("config.ini not found, skipping BootConfig patch.",True); return
         with open(cfg_path,"r",encoding="utf-8",errors="replace") as f: content=f.read()
-        import re as _re
-        patched=_re.sub(r'(BootConfig\s*=\s*)0',r'\g<1>1',content)
+        patched=re.sub(r'(BootConfig\s*=\s*)0',r'\g<1>1',content)
         if patched==content:
             self._l("BootConfig already 1 or not found - no change."); return
         with open(cfg_path,"w",encoding="utf-8") as f: f.write(patched)
@@ -414,6 +412,7 @@ class ModWorker(QtCore.QThread):
         self._l("="*50)
 
     def _full(self):
+        self._check_deps(); self._check_disk_space(4*(1<<30))
         cfg=GAME_CONFIGS[self.game_key]; dl=xdg_download(); desk=xdg_desktop()
         iso=os.path.join(dl,cfg["iso_name"]); mod=os.path.join(dl,cfg["mod_name"])
         fdir=os.path.join(desk,cfg["final_name"])
@@ -455,7 +454,7 @@ class ModWorker(QtCore.QThread):
 
     def _mod_only(self):
         cfg=GAME_CONFIGS[self.game_key]; desk=xdg_desktop()
-        gdir=os.path.join(desk,cfg["folder"]); fdir=os.path.join(desk,cfg["final_name"])
+        gdir=os.path.join(desk,cfg["folder"])
         if not os.path.isdir(gdir):
             self._l("Game folder not found: "+cfg["folder"],True)
             self._l("Use A/D to download and extract, or extract manually.",True)
@@ -467,17 +466,13 @@ class ModWorker(QtCore.QThread):
         mzip=self._find(cfg["mod_name"])
         if not mzip: self._l(cfg["mod_name"]+" not found.",True); raise FileNotFoundError(cfg["mod_name"])
         self._zip(cfg["mod_name"],mzip,tsub)
-        self._l("Renaming to: "+cfg["final_name"])
-        if os.path.exists(fdir): shutil.rmtree(fdir)
-        shutil.move(tsub,fdir)
-        self._l("Removing leftover game folder ..."); shutil.rmtree(gdir)
-        os.makedirs(os.path.join(fdir,"savedata"),exist_ok=True)
+        os.makedirs(os.path.join(gdir,"savedata"),exist_ok=True)
         self._l("Created savedata folder.")
         self._clean([mzip])
-        self._write_launch_script(fdir,cfg)
-        self._patch_config_ini(fdir)
+        self._write_launch_script(gdir,cfg)
+        self._patch_config_ini(gdir)
         self._l("="*50)
-        self._l("ALL DONE! -> "+cfg["final_name"])
+        self._l("ALL DONE! -> "+cfg["folder"])
         self._l("Run: bash run_proton.sh  (inside the game folder)")
         self._l("Black side bars = correct. Classic REbirth enforces 4:3.")
         self._l("Good luck, S.T.A.R.S.!")
@@ -657,14 +652,5 @@ class REModderApp(QtWidgets.QWidget):
 
 
 if __name__=="__main__":
-    try:
-        import ctypes
-        hwnd=ctypes.windll.kernel32.GetConsoleWindow()
-        if hwnd: ctypes.windll.user32.ShowWindow(hwnd,6)
-    except Exception: pass
-    try:
-        subprocess.run(["xdotool","getactivewindow","windowminimize"],
-                       capture_output=True,timeout=2)
-    except Exception: pass
     app=QtWidgets.QApplication(sys.argv); app.setApplicationName("RE2 Linux Modder")
     win=REModderApp(); win.show(); sys.exit(app.exec_())
