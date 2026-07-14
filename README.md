@@ -66,7 +66,7 @@ chmod +x LinuxBIO2.py
 
 1. Click **A/D (Auto Download)**
 2. The tool will:
-   - Download the RE2 ISO from Archive.org
+   - Download the RE2 ISO 
    - Download Bio2_mod.zip from GitHub
    - Extract the ISO to your Desktop
    - Apply the mod
